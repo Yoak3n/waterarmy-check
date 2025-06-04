@@ -44,13 +44,14 @@ def get_all_comments(video_id:int |str, sort=2)-> List[Comment]:
         res = get_comments(video_id, page, sort)
         if res['code'] != 0:
             raise Exception(f"Error fetching comments: {res['message']}")
+        tip = f"获取{video_id}的评论，第{page}页"
         if pbar is None:
             with open('comments.json', 'w', encoding='utf-8') as f:
                 json.dump(res, f, ensure_ascii=False, indent=4)
             # 总页数应是根评论的总数，但现在的api中acount是所有评论的总数，包括子评论，所以除以20得到的页数会有很大误差
             # 只能选择将评论总数作为进度条的总数，而不是以总页数为进度条的总数
             total_comments = res['data']['page']['acount']
-            pbar = tqdm(total=total_comments, desc="获取评论中...")
+            pbar = tqdm(total=total_comments, desc=tip)
             # 处理置顶评论
             if 'top_replies' in res['data'] and res['data']['top_replies']:
                 top_comments, top_sub_comments_count = extract_comments(res['data']['top_replies'])
@@ -65,15 +66,22 @@ def get_all_comments(video_id:int |str, sort=2)-> List[Comment]:
             pbar.update(current_page_comments_count)
             count += current_page_comments_count
             pd = res['data']['page']['num']
+            # 检查当前页是否与预期的页号相同，如果不同则打印警告信息
+            # 这个检查是为了确保我们没有漏掉任何评论，因为api返回的页号可能与我们期望的不同
             if pd != page:
                 print(f"Warning: Page number mismatch. Expected {page}, got {pd}.")
             page += 1
-        if count >= 700:
-            pbar.set_description("暂停中...")
-            time.sleep(20)  # 暂停20秒，避免过快过多请求导致风控
-            count = 0  
+            if count >= 1000:
+                pbar.set_description("暂停中...")
+                # 暂停20秒，避免过快过多请求导致风控
+                for i in range(21):
+                    time.sleep(1)
+                    pbar.set_description(f"暂停中...{20-i}s")
+                count = 0 
+                pbar.set_description(tip) 
         else:
             break
+
     if pbar:
         pbar.set_description("获取评论完成")
         pbar.close()

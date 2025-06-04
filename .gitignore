@@ -5,7 +5,10 @@ build/
 dist/
 wheels/
 *.egg-info
+# Run tests
 cookie.txt
+*.json
+output/
 # Virtual environments
 .venv
-*.json
+

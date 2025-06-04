@@ -1,4 +1,5 @@
 from typing import Generator
+import json
 
 from utils.requests import requests_get
 from models.item import Video
@@ -29,5 +30,23 @@ class Topic:
         for video in self.videos:
             comments = get_all_comments(video.avid)
             video.comments = comments
+    def export_to_file(self):
+        for video in self.videos:
+            check_directory(f"output/{self.name}")
+            sub_count = 0
+            for comment in video.comments:
+                sub_count += len(comment.children)
+            with open(f"output/{self.name}/{video.bvid}.json", 'w', encoding='utf-8') as f:
+                output = {
+                    'name': self.name,
+                    'video': video.to_json(),
+                    'comments': [comment.to_json() for comment in video.comments],
+                    'count': len(video.comments) + sub_count
+                }
+                json.dump(output, f, ensure_ascii=False, indent=4)
 
         
+def check_directory(path):
+    import os
+    if not os.path.exists(path):
+        os.makedirs(path)
