@@ -1,3 +1,4 @@
+import time
 from typing import List,Tuple
 from tqdm import tqdm
 import json
@@ -38,7 +39,7 @@ def get_all_comments(video_id:int |str, sort=2)-> List[Comment]:
     page = 1
     comments= []
     pbar = None
-
+    count = 0
     while True:
         res = get_comments(video_id, page, sort)
         if res['code'] != 0:
@@ -51,20 +52,26 @@ def get_all_comments(video_id:int |str, sort=2)-> List[Comment]:
             total_comments = res['data']['page']['acount']
             pbar = tqdm(total=total_comments, desc="获取评论中...")
             # 处理置顶评论
-            if res['data']['top_replies']:
+            if 'top_replies' in res['data'] and res['data']['top_replies']:
                 top_comments, top_sub_comments_count = extract_comments(res['data']['top_replies'])
                 comments.extend(top_comments)
                 pbar.update(top_sub_comments_count)
+                count += top_sub_comments_count
 
 
         if res['data']['replies']:
             current_page_comments,current_page_comments_count = extract_comments(res['data']['replies'])
             comments.extend(current_page_comments)
             pbar.update(current_page_comments_count)
+            count += current_page_comments_count
             pd = res['data']['page']['num']
             if pd != page:
                 print(f"Warning: Page number mismatch. Expected {page}, got {pd}.")
             page += 1
+        if count >= 700:
+            pbar.set_description("暂停中...")
+            time.sleep(20)  # 暂停20秒，避免过快过多请求导致风控
+            count = 0  
         else:
             break
     if pbar:
@@ -131,7 +138,7 @@ def get_comment_tree(oid:int,root:int) ->Tuple[List[Comment],int]:
         pd = res['data']['page']['num']
         if pd!= page:
             print(f"Warning: Sub-comment page number mismatch. Expected {page}, got {pd}.")
-            # 如果获取到的当前页为0，说明没有子评论，且目前已被风控，直接返回
+            # 如果获取到的当前页为0，没有子评论，说明目前已被风控，直接返回
             # 解决办法是刷新cookie
             if pd == 0:
                 return [],count
