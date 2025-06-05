@@ -1,5 +1,6 @@
 import requests
-from typing import Any
+import os
+
 def get_cookie()-> str:
     """Retrieves the cookie from the environment variable 'BILIBILI_COOKIE'.
     Returns:
@@ -21,7 +22,6 @@ def requests_get(url:str,params = None ):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
         'Cookie': get_cookie()
     }
-    
     response = requests.get(url,params=params, headers=headers)
     if response.status_code != 200:
         raise requests.RequestException(f"HTTP Error: {response.status_code}")

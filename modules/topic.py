@@ -2,7 +2,8 @@ from typing import Generator
 import json
 
 from utils.requests import requests_get
-from models.item import Video
+from utils.file import check_directory
+from models import Video
 
 SEARCH_URL = "https://api.bilibili.com/x/web-interface/search/type"
 class Topic:
@@ -26,10 +27,11 @@ class Topic:
             yield video
 
     def collect_comments(self):
-        from modules.get_comments import get_all_comments
+        from modules.comments import get_all_comments
         for video in self.videos:
             comments = get_all_comments(video.avid)
             video.comments = comments
+
     def export_to_file(self):
         for video in self.videos:
             check_directory(f"output/{self.name}")
@@ -46,7 +48,3 @@ class Topic:
                 json.dump(output, f, ensure_ascii=False, indent=4)
 
         
-def check_directory(path):
-    import os
-    if not os.path.exists(path):
-        os.makedirs(path)

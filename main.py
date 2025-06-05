@@ -1,5 +1,5 @@
 import json
-from modules.get_comments import get_all_comments
+from modules.comments import get_all_comments
 
 
 def main():

@@ -3,7 +3,7 @@ from typing import List,Tuple
 from tqdm import tqdm
 import json
 from utils.requests import requests_get
-from models.item import Comment, User
+from models import Comment, User
 from utils.convert import bv2av
 
 QUERY_URL = "https://api.bilibili.com/x/v2/reply"
@@ -71,8 +71,7 @@ def get_all_comments(video_id:int |str, sort=2)-> List[Comment]:
             if pd != page:
                 print(f"Warning: Page number mismatch. Expected {page}, got {pd}.")
             page += 1
-            if count >= 1000:
-                pbar.set_description("暂停中...")
+            if count >= 700:
                 # 暂停20秒，避免过快过多请求导致风控
                 for i in range(21):
                     time.sleep(1)
