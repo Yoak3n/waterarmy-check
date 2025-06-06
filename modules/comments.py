@@ -43,12 +43,14 @@ def get_all_comments(video_id:int |str, sort=2)-> List[Comment]:
     while True:
         res = get_comments(video_id, page, sort)
         if res['code'] != 0:
-            raise Exception(f"Error fetching comments: {res['message']}")
+            print(f"Warning:",res['message'])
+            # raise Exception(f"Error fetching comments: {res['message']}")
+            continue
         tip = f"获取{video_id}的评论，第{page}页"
         if pbar is None:
             with open('comments.json', 'w', encoding='utf-8') as f:
                 json.dump(res, f, ensure_ascii=False, indent=4)
-            # 总页数应是根评论的总数，但现在的api中acount是所有评论的总数，包括子评论，所以除以20得到的页数会有很大误差
+            # 总页数应根据根评论的总数，但现在的api中acount是所有评论的总数，包括子评论，所以除以20得到的页数会有很大误差
             # 只能选择将评论总数作为进度条的总数，而不是以总页数为进度条的总数
             total_comments = res['data']['page']['acount']
             pbar = tqdm(total=total_comments, desc=tip)
@@ -72,10 +74,10 @@ def get_all_comments(video_id:int |str, sort=2)-> List[Comment]:
                 print(f"Warning: Page number mismatch. Expected {page}, got {pd}.")
             page += 1
             if count >= 700:
-                # 暂停20秒，避免过快过多请求导致风控
-                for i in range(21):
+                # 暂停60秒，避免过快过多请求导致风控
+                for i in range(61):
                     time.sleep(1)
-                    pbar.set_description(f"暂停中...{20-i}s")
+                    pbar.set_description(f"暂停中...{60-i}s")
                 count = 0 
                 pbar.set_description(tip) 
         else:
@@ -112,8 +114,12 @@ def extract_comments(data:list)-> Tuple[List[Comment],int]:
             user=User(uid=user['mid'], name=user['uname']),
             text=text
         )
-        if ('replies' in reply) and reply['replies']:
-            # 这两个函数怎么在左脚踩右脚
+        # 这两个函数怎么在左脚踩右脚
+        # 触发风控的大头应该就是在这里，应该在检测到不是根评论时不调用get_comment_tree
+        # 子评论应该不会再有子评论了，但replies字段为null时应该不会进入这个分支
+        # 因此要考虑不再获取所有子评论
+        # 或者考虑使用队列来依次获取，即意味着重构
+        if ('replies' in reply) and reply['replies'] and reply['root'] == 0:
             comment.children,c  = get_comment_tree(oid, rpid)
             count += c
         else:
@@ -121,6 +127,38 @@ def extract_comments(data:list)-> Tuple[List[Comment],int]:
         count += 1
         ret.append(comment)
     return ret,count
+
+def get_comment_tree_through_queue(oid:int, root:int) ->List[Comment]:
+    """
+    获取评论树的子评论
+    :param oid: 视频id
+    :param root: 根评论id
+    :return: 子评论列表
+    """
+    comments = []
+    page = 1
+    total_pages = -1
+    while total_pages == -1 or page <= total_pages:
+        params = {
+            'type': 1,
+            'oid': oid,
+            'root': root,
+            'ps': 20,
+            'pn': page,
+        }
+        res = requests_get(SUB_REPLY_URL, params=params)
+        if res['code'] != 0:
+            raise Exception(f"Error fetching comments: {res['message']}")
+        if total_pages == -1:
+            total_pages = res['data']['page']['count'] / 20 if res['data']['page']['count'] % 20 == 0 else res['data']['page']['count'] / 20 + 1
+        pd = res['data']['page']['num']
+        if pd != page:
+            print(f"Warning: Sub-comment page number mismatch. Expected {page}, got {pd}.")
+        page += 1
+        current_page_comments, _ = extract_comments(res['data']['replies'])
+        comments.extend(current_page_comments)
+    return comments
+
 
 def get_comment_tree(oid:int,root:int) ->Tuple[List[Comment],int]:
     page = 1

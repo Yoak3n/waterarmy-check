@@ -1,6 +1,6 @@
 from typing import Generator
 import json
-
+from requests.exceptions import RequestException
 from utils.requests import requests_get
 from utils.file import check_directory
 from models import Video
@@ -28,10 +28,12 @@ class Topic:
 
     def collect_comments(self):
         from modules.comments import get_all_comments
-        for video in self.videos:
-            comments = get_all_comments(video.avid)
-            video.comments = comments
-
+        try:
+            for video in self.videos:
+                comments = get_all_comments(video.avid)
+                video.comments = comments
+        except RequestException as e:
+            print(e)
     def export_to_file(self):
         for video in self.videos:
             check_directory(f"output/{self.name}")
