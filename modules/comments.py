@@ -1,13 +1,86 @@
 import time
+import json
+import asyncio
+
 from typing import List,Tuple
 from tqdm import tqdm
-import json
+
 from utils.requests import requests_get
 from models import Comment, User
 from utils.convert import bv2av
 
 QUERY_URL = "https://api.bilibili.com/x/v2/reply"
 SUB_REPLY_URL = "https://api.bilibili.com/x/v2/reply/reply" 
+
+class CommentsCollector:
+    def __init__(self, video_id:int |str, sort=2):
+        self.video_id = video_id
+        self.sort = sort
+        self.queue = asyncio.Queue()
+        self.root_comments = []
+
+    def __extract_comments(self, data:list):
+        for reply in data:
+            rpid = reply['rpid']
+            oid = reply['oid']
+            user = reply['member']
+            content = reply['content']
+            text = ''
+            if 'at_name_to_mid' in content:
+                at_name = list(content['at_name_to_mid'].keys())[0]
+                text = content['message'].lstrip(f"回复 @{at_name} :" )
+            else:
+                text = content['message']
+
+            comment = Comment(
+                rpid=rpid,
+                oid=oid,
+                user=User(uid=user['mid'], name=user['uname']),
+                text=text
+            )
+            self.root_comments.append(comment)
+
+    async def push_comments_tree_queue(self, page:int):
+        while True:
+            data = await self.queue.get()
+            if data is None:
+                break
+            await self.process_data(data)
+
+    async def process_data(self,data):
+        print(f"Processing data for page...")
+        # comments, count = extract_comments(data['replies'])
+
+
+    def __get_comments_by_page(self, page:int) -> List[Comment]:
+        """
+        获取指定页数的评论
+        :param page: 页数
+        :return: 评论列表
+        """
+        if isinstance(self.video_id, str):
+            if self.video_id.startswith('BV'):
+                self.video_id = bv2av(self.video_id)
+            else:
+                raise ValueError("Invalid video ID format. Use 'AV' or 'BV' format.")
+        params = {
+            'oid': self.video_id,
+            'pn': page,
+            'type': 1,
+            'sort': self.sort
+        }
+        res = requests_get(QUERY_URL, params=params)
+        comments,c = extract_comments(res['data']['replies'])
+        return comments
+    def collect(self):
+        get_all_comments(self.video_id, self.sort)
+
+    def get_comments(self) -> List[Comment]:
+        return self.root_comments
+
+    def save_to_file(self, filename='comments.json'):
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump([comment.to_json() for comment in self.root_comments], f, ensure_ascii=False, indent=4)
 
 def get_comments(video_id:int |str, page=1, sort=2):
     '''

@@ -14,7 +14,7 @@ def timing_decorator(func):
 
 @timing_decorator
 def test_topic():
-    topic = Topic("哈佛", "哈佛")
+    topic = Topic("小米", "小米")
     topic.collect_comments()
     topic.export_to_file()
     
